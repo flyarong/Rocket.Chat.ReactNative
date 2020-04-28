@@ -1,39 +1,44 @@
 import React from 'react';
 import { View, Text } from 'react-native';
 import PropTypes from 'prop-types';
-import { RectButton } from 'react-native-gesture-handler';
 
 import styles from './styles';
-import { COLOR_TEXT } from '../../constants/colors';
+import Touch from '../../utils/touch';
+import { themes } from '../../constants/colors';
+import { withTheme } from '../../theme';
 
 const Item = React.memo(({
-	left, text, onPress, testID, current
+	left, right, text, onPress, testID, current, theme
 }) => (
-	<RectButton
+	<Touch
 		key={testID}
 		testID={testID}
 		onPress={onPress}
-		underlayColor={COLOR_TEXT}
-		activeOpacity={0.1}
-		style={[styles.item, current && styles.itemCurrent]}
+		theme={theme}
+		style={[styles.item, current && { backgroundColor: themes[theme].borderColor }]}
 	>
-		<View style={styles.itemLeft}>
+		<View style={styles.itemHorizontal}>
 			{left}
 		</View>
 		<View style={styles.itemCenter}>
-			<Text style={styles.itemText}>
+			<Text style={[styles.itemText, { color: themes[theme].titleText }]}>
 				{text}
 			</Text>
 		</View>
-	</RectButton>
+		<View style={styles.itemHorizontal}>
+			{right}
+		</View>
+	</Touch>
 ));
 
 Item.propTypes = {
 	left: PropTypes.element,
+	right: PropTypes.element,
 	text: PropTypes.string,
 	current: PropTypes.bool,
 	onPress: PropTypes.func,
-	testID: PropTypes.string
+	testID: PropTypes.string,
+	theme: PropTypes.string
 };
 
-export default Item;
+export default withTheme(Item);

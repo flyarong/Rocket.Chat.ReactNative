@@ -87,4 +87,12 @@ export default class Subscription extends Model {
 	@children('threads') threads;
 
 	@children('thread_messages') threadMessages;
+
+	@field('hide_unread_status') hideUnreadStatus;
+
+	@json('sys_mes', sanitizer) sysMes;
+
+	@json('uids', sanitizer) uids;
+
+	@json('usernames', sanitizer) usernames;
 }

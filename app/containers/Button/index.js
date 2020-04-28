@@ -1,48 +1,27 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import { StyleSheet, Text, ActivityIndicator } from 'react-native';
-import { RectButton } from 'react-native-gesture-handler';
+import { StyleSheet, Text } from 'react-native';
+import Touchable from 'react-native-platform-touchable';
 
-import { COLOR_BUTTON_PRIMARY } from '../../constants/colors';
+import { themes } from '../../constants/colors';
 import sharedStyles from '../../views/Styles';
+import ActivityIndicator from '../ActivityIndicator';
 
-const colors = {
-	background_primary: COLOR_BUTTON_PRIMARY,
-	background_secondary: 'white',
-
-	text_color_primary: 'white',
-	text_color_secondary: COLOR_BUTTON_PRIMARY
-};
-
-/* eslint-disable react-native/no-unused-styles */
 const styles = StyleSheet.create({
 	container: {
-		paddingHorizontal: 15,
+		paddingHorizontal: 14,
 		justifyContent: 'center',
 		height: 48,
 		borderRadius: 2,
-		marginBottom: 10
+		marginBottom: 12
 	},
 	text: {
-		fontSize: 18,
-		textAlign: 'center'
-	},
-	background_primary: {
-		backgroundColor: colors.background_primary
-	},
-	background_secondary: {
-		backgroundColor: colors.background_secondary
-	},
-	text_primary: {
-		...sharedStyles.textMedium,
-		color: colors.text_color_primary
-	},
-	text_secondary: {
-		...sharedStyles.textBold,
-		color: colors.text_color_secondary
+		fontSize: 16,
+		textAlign: 'center',
+		...sharedStyles.textMedium
 	},
 	disabled: {
-		backgroundColor: '#e1e5e8'
+		opacity: 0.3
 	}
 });
 
@@ -54,6 +33,9 @@ export default class Button extends React.PureComponent {
 		disabled: PropTypes.bool,
 		backgroundColor: PropTypes.string,
 		loading: PropTypes.bool,
+		theme: PropTypes.string,
+		color: PropTypes.string,
+		fontSize: PropTypes.string,
 		style: PropTypes.any
 	}
 
@@ -67,15 +49,24 @@ export default class Button extends React.PureComponent {
 
 	render() {
 		const {
-			title, type, onPress, disabled, backgroundColor, loading, style, ...otherProps
+			title, type, onPress, disabled, backgroundColor, color, loading, style, theme, fontSize, ...otherProps
 		} = this.props;
+		const isPrimary = type === 'primary';
+
+		let textColor = isPrimary ? themes[theme].buttonText : themes[theme].bodyText;
+		if (color) {
+			textColor = color;
+		}
+
 		return (
-			<RectButton
+			<Touchable
 				onPress={onPress}
-				enabled={!(disabled || loading)}
+				disabled={disabled || loading}
 				style={[
 					styles.container,
-					backgroundColor ? { backgroundColor } : styles[`background_${ type }`],
+					backgroundColor
+						? { backgroundColor }
+						: { backgroundColor: isPrimary ? themes[theme].actionTintColor : themes[theme].backgroundColor },
 					disabled && styles.disabled,
 					style
 				]}
@@ -83,10 +74,20 @@ export default class Button extends React.PureComponent {
 			>
 				{
 					loading
-						? <ActivityIndicator color={colors[`text_color_${ type }`]} />
-						: <Text style={[styles.text, styles[`text_${ type }`]]}>{title}</Text>
+						? <ActivityIndicator color={textColor} />
+						: (
+							<Text
+								style={[
+									styles.text,
+									{ color: textColor },
+									fontSize && { fontSize }
+								]}
+							>
+								{title}
+							</Text>
+						)
 				}
-			</RectButton>
+			</Touchable>
 		);
 	}
 }

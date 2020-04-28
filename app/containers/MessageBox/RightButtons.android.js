@@ -1,27 +1,32 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 
-import { SendButton, AudioButton, FileButton } from './buttons';
+import { SendButton, AudioButton, ActionsButton } from './buttons';
 
 const RightButtons = React.memo(({
-	showSend, submit, recordAudioMessage, showFileActions
+	theme, showSend, submit, recordAudioMessage, recordAudioMessageEnabled, showMessageBoxActions
 }) => {
 	if (showSend) {
-		return <SendButton onPress={submit} />;
+		return <SendButton onPress={submit} theme={theme} />;
 	}
-	return (
-		<>
-			<AudioButton onPress={recordAudioMessage} />
-			<FileButton onPress={showFileActions} />
-		</>
-	);
+	if (recordAudioMessageEnabled) {
+		return (
+			<>
+				<AudioButton onPress={recordAudioMessage} theme={theme} />
+				<ActionsButton onPress={showMessageBoxActions} theme={theme} />
+			</>
+		);
+	}
+	return <ActionsButton onPress={showMessageBoxActions} theme={theme} />;
 });
 
 RightButtons.propTypes = {
+	theme: PropTypes.string,
 	showSend: PropTypes.bool,
 	submit: PropTypes.func.isRequired,
 	recordAudioMessage: PropTypes.func.isRequired,
-	showFileActions: PropTypes.func.isRequired
+	recordAudioMessageEnabled: PropTypes.bool,
+	showMessageBoxActions: PropTypes.func.isRequired
 };
 
 export default RightButtons;

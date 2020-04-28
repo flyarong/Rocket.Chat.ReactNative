@@ -1,23 +1,19 @@
 import React from 'react';
 import {
-	View, Text, Image, TouchableOpacity, BackHandler
+	View, Text, Image, BackHandler, Linking
 } from 'react-native';
 import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
-import { SafeAreaView } from 'react-navigation';
 import Orientation from 'react-native-orientation-locker';
 
-import { selectServerRequest, serverInitAdd, serverFinishAdd } from '../../actions/server';
 import { appStart as appStartAction } from '../../actions';
 import I18n from '../../i18n';
-import openLink from '../../utils/openLink';
-import Button from './Button';
+import Button from '../../containers/Button';
 import styles from './styles';
-import { isIOS, isNotch } from '../../utils/deviceInfo';
-import EventEmitter from '../../utils/events';
-import { CustomIcon } from '../../lib/Icons';
-import StatusBar from '../../containers/StatusBar';
-import { COLOR_PRIMARY, COLOR_WHITE } from '../../constants/colors';
+import { isTablet } from '../../utils/deviceInfo';
+import { themes } from '../../constants/colors';
+import { withTheme } from '../../theme';
+import FormContainer, { FormContainerInner } from '../../containers/FormContainer';
 
 class OnboardingView extends React.Component {
 	static navigationOptions = () => ({
@@ -26,44 +22,27 @@ class OnboardingView extends React.Component {
 
 	static propTypes = {
 		navigation: PropTypes.object,
-		adding: PropTypes.bool,
-		selectServer: PropTypes.func.isRequired,
-		currentServer: PropTypes.string,
-		initAdd: PropTypes.func,
-		finishAdd: PropTypes.func,
-		appStart: PropTypes.func
+		appStart: PropTypes.func,
+		theme: PropTypes.string
 	}
 
 	constructor(props) {
 		super(props);
 		BackHandler.addEventListener('hardwareBackPress', this.handleBackPress);
-		this.previousServer = props.navigation.getParam('previousServer');
-		Orientation.lockToPortrait();
-	}
-
-	componentDidMount() {
-		const { initAdd } = this.props;
-		if (this.previousServer) {
-			initAdd();
+		if (!isTablet) {
+			Orientation.lockToPortrait();
 		}
-		EventEmitter.addEventListener('NewServer', this.handleNewServerEvent);
 	}
 
-	shouldComponentUpdate() {
+	shouldComponentUpdate(nextProps) {
+		const { theme } = this.props;
+		if (theme !== nextProps.theme) {
+			return true;
+		}
 		return false;
 	}
 
 	componentWillUnmount() {
-		const {
-			selectServer, currentServer, adding, finishAdd
-		} = this.props;
-		if (adding) {
-			if (this.previousServer !== currentServer) {
-				selectServer(this.previousServer);
-			}
-			finishAdd();
-		}
-		EventEmitter.removeListener('NewServer', this.handleNewServerEvent);
 		BackHandler.removeEventListener('hardwareBackPress', this.handleBackPress);
 	}
 
@@ -73,103 +52,51 @@ class OnboardingView extends React.Component {
 		return false;
 	}
 
-	close = () => {
-		const { appStart } = this.props;
-		appStart('inside');
-	}
-
-	newServer = (server) => {
-		const { navigation } = this.props;
-		navigation.navigate('NewServerView', { server });
-	}
-
-	handleNewServerEvent = (event) => {
-		const { server } = event;
-		this.newServer(server);
-	}
-
 	connectServer = () => {
-		this.newServer();
+		const { navigation } = this.props;
+		navigation.navigate('NewServerView');
 	}
 
-	joinCommunity = () => {
-		this.newServer('https://open.rocket.chat');
-	}
-
-	createWorkspace = () => {
-		openLink('https://cloud.rocket.chat/trial');
-	}
-
-	renderClose = () => {
-		if (this.previousServer) {
-			let top = 15;
-			if (isIOS) {
-				top = isNotch ? 45 : 30;
-			}
-			return (
-				<TouchableOpacity
-					style={[styles.closeModal, { top }]}
-					onPress={this.close}
-					testID='onboarding-close'
-				>
-					<CustomIcon
-						name='cross'
-						size={30}
-						color={COLOR_PRIMARY}
-					/>
-				</TouchableOpacity>
-			);
+	createWorkspace = async() => {
+		try {
+			await Linking.openURL('https://cloud.rocket.chat/trial');
+		} catch {
+			// do nothing
 		}
-		return null;
 	}
 
 	render() {
+		const { theme } = this.props;
 		return (
-			<SafeAreaView style={styles.container} testID='onboarding-view'>
-				<StatusBar light />
-				<Image style={styles.onboarding} source={{ uri: 'onboarding' }} fadeDuration={0} />
-				<Text style={styles.title}>{I18n.t('Welcome_to_RocketChat')}</Text>
-				<Text style={styles.subtitle}>{I18n.t('Open_Source_Communication')}</Text>
-				<View style={styles.buttonsContainer}>
-					<Button
-						type='secondary'
-						title={I18n.t('Connect_to_a_server')}
-						icon={<CustomIcon name='permalink' size={30} color={COLOR_PRIMARY} />}
-						onPress={this.connectServer}
-						testID='connect-server-button'
-					/>
-					<Button
-						type='secondary'
-						title={I18n.t('Join_the_community')}
-						subtitle='open.rocket.chat'
-						icon={<Image source={{ uri: 'logo_onboarding' }} style={{ width: 32, height: 27 }} fadeDuration={0} />}
-						onPress={this.joinCommunity}
-						testID='join-community-button'
-					/>
-					<Button
-						type='primary'
-						title={I18n.t('Create_a_new_workspace')}
-						icon={<CustomIcon name='plus' size={30} color={COLOR_WHITE} />}
-						onPress={this.createWorkspace}
-						testID='create-workspace-button'
-					/>
-				</View>
-				{this.renderClose()}
-			</SafeAreaView>
+			<FormContainer theme={theme}>
+				<FormContainerInner>
+					<Image style={styles.onboarding} source={{ uri: 'logo' }} fadeDuration={0} />
+					<Text style={[styles.title, { color: themes[theme].titleText }]}>{I18n.t('Onboarding_title')}</Text>
+					<Text style={[styles.subtitle, { color: themes[theme].controlText }]}>{I18n.t('Onboarding_subtitle')}</Text>
+					<Text style={[styles.description, { color: themes[theme].auxiliaryText }]}>{I18n.t('Onboarding_description')}</Text>
+					<View style={styles.buttonsContainer}>
+						<Button
+							title={I18n.t('Onboarding_join_workspace')}
+							type='primary'
+							onPress={this.connectServer}
+							theme={theme}
+						/>
+						<Button
+							title={I18n.t('Create_a_new_workspace')}
+							type='secondary'
+							backgroundColor={themes[theme].chatComponentBackground}
+							onPress={this.createWorkspace}
+							theme={theme}
+						/>
+					</View>
+				</FormContainerInner>
+			</FormContainer>
 		);
 	}
 }
 
-const mapStateToProps = state => ({
-	currentServer: state.server.server,
-	adding: state.server.adding
-});
-
 const mapDispatchToProps = dispatch => ({
-	initAdd: () => dispatch(serverInitAdd()),
-	finishAdd: () => dispatch(serverFinishAdd()),
-	selectServer: server => dispatch(selectServerRequest(server)),
 	appStart: root => dispatch(appStartAction(root))
 });
 
-export default connect(mapStateToProps, mapDispatchToProps)(OnboardingView);
+export default connect(null, mapDispatchToProps)(withTheme(OnboardingView));

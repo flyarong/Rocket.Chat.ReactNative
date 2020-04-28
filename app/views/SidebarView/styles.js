@@ -1,12 +1,10 @@
 import { StyleSheet } from 'react-native';
-import { COLOR_SEPARATOR, COLOR_WHITE } from '../../constants/colors';
 
 import sharedStyles from '../Styles';
 
 export default StyleSheet.create({
 	container: {
-		flex: 1,
-		backgroundColor: COLOR_WHITE
+		flex: 1
 	},
 	item: {
 		flexDirection: 'row',
@@ -15,7 +13,7 @@ export default StyleSheet.create({
 	itemCurrent: {
 		backgroundColor: '#E1E5E8'
 	},
-	itemLeft: {
+	itemHorizontal: {
 		marginHorizontal: 10,
 		width: 30,
 		alignItems: 'center'
@@ -26,12 +24,10 @@ export default StyleSheet.create({
 	itemText: {
 		marginVertical: 16,
 		fontSize: 14,
-		...sharedStyles.textSemibold,
-		...sharedStyles.textColorNormal
+		...sharedStyles.textSemibold
 	},
 	separator: {
 		borderBottomWidth: StyleSheet.hairlineWidth,
-		borderColor: COLOR_SEPARATOR,
 		marginVertical: 4
 	},
 	header: {
@@ -50,12 +46,7 @@ export default StyleSheet.create({
 	},
 	username: {
 		fontSize: 14,
-		...sharedStyles.textColorNormal,
 		...sharedStyles.textMedium
-	},
-	headerIcon: {
-		paddingHorizontal: 10,
-		...sharedStyles.textColorNormal
 	},
 	avatar: {
 		marginHorizontal: 10
@@ -65,14 +56,12 @@ export default StyleSheet.create({
 	},
 	currentServerText: {
 		fontSize: 14,
-		...sharedStyles.textColorNormal,
 		...sharedStyles.textSemibold
 	},
 	version: {
 		marginHorizontal: 10,
 		marginBottom: 10,
 		fontSize: 13,
-		...sharedStyles.textColorNormal,
 		...sharedStyles.textSemibold
 	},
 	inverted: {

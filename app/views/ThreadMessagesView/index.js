@@ -12,7 +12,7 @@ import { sanitizedRaw } from '@nozbe/watermelondb/RawRecord';
 
 import styles from './styles';
 import Message from '../../containers/message';
-import RCActivityIndicator from '../../containers/ActivityIndicator';
+import ActivityIndicator from '../../containers/ActivityIndicator';
 import I18n from '../../i18n';
 import RocketChat from '../../lib/rocketchat';
 import database from '../../lib/database';
@@ -21,21 +21,33 @@ import buildMessage from '../../lib/methods/helpers/buildMessage';
 import log from '../../utils/log';
 import debounce from '../../utils/debounce';
 import protectedFunction from '../../lib/methods/helpers/protectedFunction';
+import { themes } from '../../constants/colors';
+import { withTheme } from '../../theme';
+import { themedHeader } from '../../utils/navigation';
+import ModalNavigation from '../../lib/ModalNavigation';
+import { getUserSelector } from '../../selectors/login';
 
-const Separator = React.memo(() => <View style={styles.separator} />);
+const Separator = React.memo(({ theme }) => <View style={[styles.separator, { backgroundColor: themes[theme].separatorColor }]} />);
+Separator.propTypes = {
+	theme: PropTypes.string
+};
+
 const API_FETCH_COUNT = 50;
 
 class ThreadMessagesView extends React.Component {
-	static navigationOptions = {
+	static navigationOptions = ({ screenProps }) => ({
+		...themedHeader(screenProps.theme),
 		title: I18n.t('Threads')
-	}
+	});
 
 	static propTypes = {
 		user: PropTypes.object,
 		navigation: PropTypes.object,
 		baseUrl: PropTypes.string,
 		useRealName: PropTypes.bool,
-		customEmojis: PropTypes.object
+		theme: PropTypes.string,
+		customEmojis: PropTypes.object,
+		screenProps: PropTypes.object
 	}
 
 	constructor(props) {
@@ -59,11 +71,9 @@ class ThreadMessagesView extends React.Component {
 	}
 
 	componentWillUnmount() {
+		console.countReset(`${ this.constructor.name }.render calls`);
 		if (this.mountInteraction && this.mountInteraction.cancel) {
 			this.mountInteraction.cancel();
-		}
-		if (this.loadInteraction && this.loadInteraction.cancel) {
-			this.loadInteraction.cancel();
 		}
 		if (this.syncInteraction && this.syncInteraction.cancel) {
 			this.syncInteraction.cancel();
@@ -77,13 +87,14 @@ class ThreadMessagesView extends React.Component {
 	}
 
 	// eslint-disable-next-line react/sort-comp
-	subscribeData = () => {
+	subscribeData = async() => {
 		try {
 			const db = database.active;
-			this.subObservable = db.collections
+			const subscription = await db.collections
 				.get('subscriptions')
-				.findAndObserve(this.rid);
-			this.subSubscription = this.subObservable
+				.find(this.rid);
+			const observable = subscription.observe();
+			this.subSubscription = observable
 				.subscribe((data) => {
 					this.subscription = data;
 				});
@@ -104,14 +115,14 @@ class ThreadMessagesView extends React.Component {
 					}
 				});
 		} catch (e) {
-			log(e);
+			// Do nothing
 		}
 	}
 
 	// eslint-disable-next-line react/sort-comp
 	init = () => {
 		if (!this.subscription) {
-			return;
+			this.load();
 		}
 		try {
 			const lastThreadSync = new Date();
@@ -126,6 +137,13 @@ class ThreadMessagesView extends React.Component {
 	}
 
 	updateThreads = async({ update, remove, lastThreadSync }) => {
+		// if there's no subscription, manage data on this.state.messages
+		// note: sync will never be called without subscription
+		if (!this.subscription) {
+			this.setState(({ messages }) => ({ messages: [...messages, ...update] }));
+			return;
+		}
+
 		try {
 			const db = database.active;
 			const threadsCollection = db.collections.get('threads');
@@ -186,13 +204,10 @@ class ThreadMessagesView extends React.Component {
 				rid: this.rid, count: API_FETCH_COUNT, offset: messages.length
 			});
 			if (result.success) {
-				this.loadInteraction = InteractionManager.runAfterInteractions(() => {
-					this.updateThreads({ update: result.threads, lastThreadSync });
-
-					this.setState({
-						loading: false,
-						end: result.count < API_FETCH_COUNT
-					});
+				this.updateThreads({ update: result.threads, lastThreadSync });
+				this.setState({
+					loading: false,
+					end: result.count < API_FETCH_COUNT
 				});
 			}
 		} catch (e) {
@@ -242,6 +257,11 @@ class ThreadMessagesView extends React.Component {
 		return null;
 	}
 
+	showAttachment = (attachment) => {
+		const { navigation } = this.props;
+		navigation.navigate('AttachmentView', { attachment });
+	}
+
 	onThreadPress = debounce((item) => {
 		const { navigation } = this.props;
 		navigation.push('RoomView', {
@@ -249,13 +269,32 @@ class ThreadMessagesView extends React.Component {
 		});
 	}, 1000, true)
 
-	renderSeparator = () => <Separator />
+	renderSeparator = () => {
+		const { theme } = this.props;
+		return <Separator theme={theme} />;
+	}
 
-	renderEmpty = () => (
-		<View style={styles.listEmptyContainer} testID='thread-messages-view'>
-			<Text style={styles.noDataFound}>{I18n.t('No_thread_messages')}</Text>
-		</View>
-	)
+	renderEmpty = () => {
+		const { theme } = this.props;
+		return (
+			<View style={[styles.listEmptyContainer, { backgroundColor: themes[theme].backgroundColor }]} testID='thread-messages-view'>
+				<Text style={[styles.noDataFound, { color: themes[theme].titleText }]}>{I18n.t('No_thread_messages')}</Text>
+			</View>
+		);
+	}
+
+	navToRoomInfo = (navParam) => {
+		const { navigation, user, screenProps } = this.props;
+		if (navParam.rid === user.id) {
+			return;
+		}
+		if (screenProps && screenProps.split) {
+			navigation.navigate('RoomActionsView', { rid: this.rid, t: this.t });
+			ModalNavigation.navigate('RoomInfoView', navParam);
+		} else {
+			navigation.navigate('RoomInfoView', navParam);
+		}
+	}
 
 	renderItem = ({ item }) => {
 		const {
@@ -276,12 +315,16 @@ class ThreadMessagesView extends React.Component {
 				baseUrl={baseUrl}
 				useRealName={useRealName}
 				getCustomEmoji={this.getCustomEmoji}
+				navToRoomInfo={this.navToRoomInfo}
+				showAttachment={this.showAttachment}
 			/>
 		);
 	}
 
 	render() {
+		console.count(`${ this.constructor.name }.render calls`);
 		const { loading, messages } = this.state;
+		const { theme } = this.props;
 
 		if (!loading && messages.length === 0) {
 			return this.renderEmpty();
@@ -289,20 +332,20 @@ class ThreadMessagesView extends React.Component {
 
 		return (
 			<SafeAreaView style={styles.list} testID='thread-messages-view' forceInset={{ vertical: 'never' }}>
-				<StatusBar />
+				<StatusBar theme={theme} />
 				<FlatList
 					data={messages}
 					extraData={this.state}
 					renderItem={this.renderItem}
-					style={styles.list}
+					style={[styles.list, { backgroundColor: themes[theme].backgroundColor }]}
 					contentContainerStyle={styles.contentContainer}
-					keyExtractor={item => item.id}
+					keyExtractor={item => item._id}
 					onEndReached={this.load}
 					onEndReachedThreshold={0.5}
 					maxToRenderPerBatch={5}
 					initialNumToRender={1}
 					ItemSeparatorComponent={this.renderSeparator}
-					ListFooterComponent={loading ? <RCActivityIndicator /> : null}
+					ListFooterComponent={loading ? <ActivityIndicator theme={theme} /> : null}
 				/>
 			</SafeAreaView>
 		);
@@ -310,14 +353,10 @@ class ThreadMessagesView extends React.Component {
 }
 
 const mapStateToProps = state => ({
-	baseUrl: state.settings.Site_Url || state.server ? state.server.server : '',
-	user: {
-		id: state.login.user && state.login.user.id,
-		username: state.login.user && state.login.user.username,
-		token: state.login.user && state.login.user.token
-	},
+	baseUrl: state.server.server,
+	user: getUserSelector(state),
 	useRealName: state.settings.UI_Use_Real_Name,
 	customEmojis: state.customEmojis
 });
 
-export default connect(mapStateToProps)(ThreadMessagesView);
+export default connect(mapStateToProps)(withTheme(ThreadMessagesView));

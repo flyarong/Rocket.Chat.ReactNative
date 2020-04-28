@@ -3,16 +3,25 @@ import PropTypes from 'prop-types';
 import { HeaderButtons, HeaderButton, Item } from 'react-navigation-header-buttons';
 
 import { CustomIcon } from '../lib/Icons';
-import { isIOS } from '../utils/deviceInfo';
-import { COLOR_PRIMARY, COLOR_WHITE } from '../constants/colors';
+import { isIOS, isAndroid } from '../utils/deviceInfo';
+import { themes } from '../constants/colors';
 import I18n from '../i18n';
+import { withTheme } from '../theme';
 
-const color = isIOS ? COLOR_PRIMARY : COLOR_WHITE;
 export const headerIconSize = 23;
 
-const CustomHeaderButton = React.memo(props => (
-	<HeaderButton {...props} IconComponent={CustomIcon} iconSize={headerIconSize} color={color} />
-));
+const CustomHeaderButton = React.memo(withTheme(({ theme, ...props }) => (
+	<HeaderButton
+		{...props}
+		IconComponent={CustomIcon}
+		iconSize={headerIconSize}
+		color={
+			isAndroid
+				? themes[theme].headerTitleColor
+				: themes[theme].headerTintColor
+		}
+	/>
+)));
 
 export const CustomHeaderButtons = React.memo(props => (
 	<HeaderButtons
@@ -27,13 +36,13 @@ export const DrawerButton = React.memo(({ navigation, testID, ...otherProps }) =
 	</CustomHeaderButtons>
 ));
 
-export const CloseModalButton = React.memo(({ navigation, testID }) => (
+export const CloseModalButton = React.memo(({ navigation, testID, onPress = () => navigation.pop() }) => (
 	<CustomHeaderButtons left>
-		<Item title='close' iconName='cross' onPress={() => navigation.pop()} testID={testID} />
+		<Item title='close' iconName='cross' onPress={onPress} testID={testID} />
 	</CustomHeaderButtons>
 ));
 
-export const CloseShareExtensionButton = React.memo(({ onPress, testID }) => (
+export const CancelModalButton = React.memo(({ onPress, testID }) => (
 	<CustomHeaderButtons left>
 		{isIOS
 			? <Item title={I18n.t('Cancel')} onPress={onPress} testID={testID} />
@@ -48,23 +57,37 @@ export const MoreButton = React.memo(({ onPress, testID }) => (
 	</CustomHeaderButtons>
 ));
 
+export const SaveButton = React.memo(({ onPress, testID }) => (
+	<CustomHeaderButtons>
+		<Item title='save' iconName='Download' onPress={onPress} testID={testID} />
+	</CustomHeaderButtons>
+));
+
 export const LegalButton = React.memo(({ navigation, testID }) => (
 	<MoreButton onPress={() => navigation.navigate('LegalView')} testID={testID} />
 ));
 
+CustomHeaderButton.propTypes = {
+	theme: PropTypes.string
+};
 DrawerButton.propTypes = {
 	navigation: PropTypes.object.isRequired,
 	testID: PropTypes.string.isRequired
 };
 CloseModalButton.propTypes = {
 	navigation: PropTypes.object.isRequired,
-	testID: PropTypes.string.isRequired
+	testID: PropTypes.string.isRequired,
+	onPress: PropTypes.func
 };
-CloseShareExtensionButton.propTypes = {
+CancelModalButton.propTypes = {
 	onPress: PropTypes.func.isRequired,
 	testID: PropTypes.string.isRequired
 };
 MoreButton.propTypes = {
+	onPress: PropTypes.func.isRequired,
+	testID: PropTypes.string.isRequired
+};
+SaveButton.propTypes = {
 	onPress: PropTypes.func.isRequired,
 	testID: PropTypes.string.isRequired
 };
