@@ -5,6 +5,7 @@ import PropTypes from 'prop-types';
 import { themes } from '../../constants/colors';
 import { CustomIcon } from '../../lib/Icons';
 import { withTheme } from '../../theme';
+import { ICON_SIZE } from './constants';
 
 const styles = StyleSheet.create({
 	icon: {
@@ -13,12 +14,17 @@ const styles = StyleSheet.create({
 	}
 });
 
-const ListIcon = React.memo(({ theme, name, color }) => (
-	<View style={styles.icon}>
+const ListIcon = React.memo(({
+	theme,
+	name,
+	color,
+	style
+}) => (
+	<View style={[styles.icon, style]}>
 		<CustomIcon
 			name={name}
 			color={color ?? themes[theme].auxiliaryText}
-			size={20}
+			size={ICON_SIZE}
 		/>
 	</View>
 ));
@@ -26,7 +32,8 @@ const ListIcon = React.memo(({ theme, name, color }) => (
 ListIcon.propTypes = {
 	theme: PropTypes.string,
 	name: PropTypes.string,
-	color: PropTypes.string
+	color: PropTypes.string,
+	style: PropTypes.object
 };
 
 ListIcon.displayName = 'List.Icon';

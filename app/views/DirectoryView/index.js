@@ -4,6 +4,7 @@ import {
 	View, FlatList, Text
 } from 'react-native';
 import { connect } from 'react-redux';
+import * as List from '../../containers/List';
 
 import Touch from '../../utils/touch';
 import RocketChat from '../../lib/rocketchat';
@@ -149,8 +150,9 @@ class DirectoryView extends React.Component {
 				this.goRoom({ rid: result.room._id, name: item.username, t: 'd' });
 			}
 		} else {
+			const { room } = await RocketChat.getRoomInfo(item._id);
 			this.goRoom({
-				rid: item._id, name: item.name, t: 'c', search: true
+				rid: item._id, name: item.name, joinCodeRequired: room.joinCodeRequired, t: 'c', search: true
 			});
 		}
 	}
@@ -163,12 +165,12 @@ class DirectoryView extends React.Component {
 				<SearchBox
 					onChangeText={this.onSearchChangeText}
 					onSubmitEditing={this.search}
-					testID='federation-view-search'
+					testID='directory-view-search'
 				/>
 				<Touch
 					onPress={this.toggleDropdown}
 					style={styles.dropdownItemButton}
-					testID='federation-view-create-channel'
+					testID='directory-view-dropdown'
 					theme={theme}
 				>
 					<View style={[sharedStyles.separatorVertical, styles.toggleDropdownContainer, { borderColor: themes[theme].separatorColor }]}>
@@ -179,11 +181,6 @@ class DirectoryView extends React.Component {
 				</Touch>
 			</>
 		);
-	}
-
-	renderSeparator = () => {
-		const { theme } = this.props;
-		return <View style={[sharedStyles.separator, styles.separator, { backgroundColor: themes[theme].separatorColor }]} />;
 	}
 
 	renderItem = ({ item, index }) => {
@@ -202,7 +199,7 @@ class DirectoryView extends React.Component {
 			title: item.name,
 			onPress: () => this.onPressItem(item),
 			baseUrl,
-			testID: `federation-view-item-${ item.name }`,
+			testID: `directory-view-item-${ item.name }`.toLowerCase(),
 			style,
 			user,
 			theme,
@@ -250,7 +247,7 @@ class DirectoryView extends React.Component {
 					keyExtractor={item => item._id}
 					ListHeaderComponent={this.renderHeader}
 					renderItem={this.renderItem}
-					ItemSeparatorComponent={this.renderSeparator}
+					ItemSeparatorComponent={List.Separator}
 					keyboardShouldPersistTaps='always'
 					ListFooterComponent={loading ? <ActivityIndicator theme={theme} /> : null}
 					onEndReached={() => this.load({})}

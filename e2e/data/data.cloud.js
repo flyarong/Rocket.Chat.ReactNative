@@ -31,6 +31,10 @@ const data = {
     channels: {
         detoxpublic: {
             name: 'detox-public'
+        },
+        detoxpublicprotected: {
+            name: 'detox-public-protected',
+            joinCode: '123'
         }
     },
     groups: {
@@ -42,6 +46,16 @@ const data = {
         username: `newuser${ value }`,
         password: `password${ value }`,
         email: `mobile+registering${ value }@rocket.chat`
+    },
+    registeringUser2: {
+        username: `newusertwo${ value }`,
+        password: `passwordtwo${ value }`,
+        email: `mobile+registeringtwo${ value }@rocket.chat`
+    },
+    registeringUser3: {
+        username: `newuserthree${ value }`,
+        password: `passwordthree${ value }`,
+        email: `mobile+registeringthree${ value }@rocket.chat`
     },
     random: value
 }

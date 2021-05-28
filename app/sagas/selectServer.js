@@ -2,7 +2,8 @@ import { put, takeLatest } from 'redux-saga/effects';
 import { Alert } from 'react-native';
 import { sanitizedRaw } from '@nozbe/watermelondb/RawRecord';
 import { Q } from '@nozbe/watermelondb';
-import semver from 'semver';
+import valid from 'semver/functions/valid';
+import coerce from 'semver/functions/coerce';
 
 import Navigation from '../lib/Navigation';
 import { SERVER } from '../actions/actionsTypes';
@@ -14,12 +15,12 @@ import { setUser } from '../actions/login';
 import RocketChat from '../lib/rocketchat';
 import database from '../lib/database';
 import log, { logServerVersion } from '../utils/log';
-import { extractHostname } from '../utils/server';
 import I18n from '../i18n';
 import { BASIC_AUTH_KEY, setBasicAuth } from '../utils/fetch';
 import { appStart, ROOT_INSIDE, ROOT_OUTSIDE } from '../actions/app';
 import UserPreferences from '../lib/userPreferences';
 import { encryptionStop } from '../actions/encryption';
+import SSLPinning from '../utils/sslPinning';
 
 import { inquiryReset } from '../ee/omnichannel/actions/inquiry';
 
@@ -39,13 +40,13 @@ const getServerInfo = function* getServerInfo({ server, raiseError = true }) {
 			return;
 		}
 
-		let serverVersion = semver.valid(serverInfo.version);
+		let serverVersion = valid(serverInfo.version);
 		if (!serverVersion) {
-			({ version: serverVersion } = semver.coerce(serverInfo.version));
+			({ version: serverVersion } = coerce(serverInfo.version));
 		}
 
 		const serversDB = database.servers;
-		const serversCollection = serversDB.collections.get('servers');
+		const serversCollection = serversDB.get('servers');
 		yield serversDB.action(async() => {
 			try {
 				const serverRecord = await serversCollection.find(server);
@@ -68,12 +69,16 @@ const getServerInfo = function* getServerInfo({ server, raiseError = true }) {
 
 const handleSelectServer = function* handleSelectServer({ server, version, fetchVersion }) {
 	try {
+		// SSL Pinning - Read certificate alias and set it to be used by network requests
+		const certificate = yield UserPreferences.getStringAsync(`${ RocketChat.CERTIFICATE_KEY }-${ server }`);
+		yield SSLPinning.setCertificate(certificate, server);
+
 		yield put(inquiryReset());
 		yield put(encryptionStop());
 		const serversDB = database.servers;
 		yield UserPreferences.setStringAsync(RocketChat.CURRENT_SERVER, server);
 		const userId = yield UserPreferences.getStringAsync(`${ RocketChat.TOKEN_KEY }-${ server }`);
-		const userCollections = serversDB.collections.get('users');
+		const userCollections = serversDB.get('users');
 		let user = null;
 		if (userId) {
 			try {
@@ -119,6 +124,7 @@ const handleSelectServer = function* handleSelectServer({ server, version, fetch
 		// and block the selectServerSuccess raising multiples errors
 		RocketChat.setSettings();
 		RocketChat.setCustomEmojis();
+		RocketChat.setPermissions();
 		RocketChat.setEnterpriseModules();
 
 		let serverInfo;
@@ -138,17 +144,15 @@ const handleSelectServer = function* handleSelectServer({ server, version, fetch
 	}
 };
 
-const handleServerRequest = function* handleServerRequest({
-	server, certificate, username, fromServerHistory
-}) {
+const handleServerRequest = function* handleServerRequest({ server, username, fromServerHistory }) {
 	try {
-		if (certificate) {
-			yield UserPreferences.setMapAsync(extractHostname(server), certificate);
-		}
+		// SSL Pinning - Read certificate alias and set it to be used by network requests
+		const certificate = yield UserPreferences.getStringAsync(`${ RocketChat.CERTIFICATE_KEY }-${ server }`);
+		yield SSLPinning.setCertificate(certificate, server);
 
 		const serverInfo = yield getServerInfo({ server });
 		const serversDB = database.servers;
-		const serversHistoryCollection = serversDB.collections.get('servers_history');
+		const serversHistoryCollection = serversDB.get('servers_history');
 
 		if (serverInfo) {
 			yield RocketChat.getLoginServices(server);

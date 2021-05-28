@@ -201,6 +201,29 @@ export default schemaMigrations({
 					]
 				})
 			]
+		},
+		{
+			toVersion: 12,
+			steps: [
+				addColumns({
+					table: 'subscriptions',
+					columns: [
+						{ name: 'ignored', type: 'string', isOptional: true }
+					]
+				})
+			]
+		},
+		{
+			toVersion: 13,
+			steps: [
+				addColumns({
+					table: 'subscriptions',
+					columns: [
+						{ name: 'team_id', type: 'string', isIndexed: true },
+						{ name: 'team_main', type: 'boolean', isOptional: true }
+					]
+				})
+			]
 		}
 	]
 });

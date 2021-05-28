@@ -1,5 +1,7 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import {
+	View, Text, StyleSheet, I18nManager
+} from 'react-native';
 import PropTypes from 'prop-types';
 
 import Touch from '../../utils/touch';
@@ -8,8 +10,9 @@ import sharedStyles from '../../views/Styles';
 import { withTheme } from '../../theme';
 import I18n from '../../i18n';
 import { Icon } from '.';
-import { BASE_HEIGHT, PADDING_HORIZONTAL } from './constants';
+import { BASE_HEIGHT, ICON_SIZE, PADDING_HORIZONTAL } from './constants';
 import { withDimensions } from '../../dimensions';
+import { CustomIcon } from '../../lib/Icons';
 
 const styles = StyleSheet.create({
 	container: {
@@ -32,18 +35,31 @@ const styles = StyleSheet.create({
 		flex: 1,
 		justifyContent: 'center'
 	},
+	textAlertContainer: {
+		flexDirection: 'row',
+		alignItems: 'center'
+	},
+	alertIcon: {
+		paddingLeft: 4
+	},
 	title: {
+		flexShrink: 1,
 		fontSize: 16,
 		...sharedStyles.textRegular
 	},
 	subtitle: {
 		fontSize: 14,
 		...sharedStyles.textRegular
+	},
+	actionIndicator: {
+		...I18nManager.isRTL
+			? { transform: [{ rotate: '180deg' }] }
+			: {}
 	}
 });
 
 const Content = React.memo(({
-	title, subtitle, disabled, testID, left, right, color, theme, translateTitle, translateSubtitle, showActionIndicator, fontScale
+	title, subtitle, disabled, testID, left, right, color, theme, translateTitle, translateSubtitle, showActionIndicator, fontScale, alert
 }) => (
 	<View style={[styles.container, disabled && styles.disabled, { height: BASE_HEIGHT * fontScale }]} testID={testID}>
 		{left
@@ -54,7 +70,12 @@ const Content = React.memo(({
 			)
 			: null}
 		<View style={styles.textContainer}>
-			<Text style={[styles.title, { color: color || themes[theme].titleText }]} numberOfLines={1}>{translateTitle ? I18n.t(title) : title}</Text>
+			<View style={styles.textAlertContainer}>
+				<Text style={[styles.title, { color: color || themes[theme].titleText }]} numberOfLines={1}>{translateTitle ? I18n.t(title) : title}</Text>
+				{alert ? (
+					<CustomIcon style={[styles.alertIcon, { color: themes[theme].dangerColor }]} size={ICON_SIZE} name='info' />
+				) : null}
+			</View>
 			{subtitle
 				? <Text style={[styles.subtitle, { color: themes[theme].auxiliaryText }]} numberOfLines={1}>{translateSubtitle ? I18n.t(subtitle) : subtitle}</Text>
 				: null
@@ -64,7 +85,7 @@ const Content = React.memo(({
 			? (
 				<View style={styles.rightContainer}>
 					{right ? right() : null}
-					{showActionIndicator ? <Icon name='chevron-right' /> : null}
+					{showActionIndicator ? <Icon name='chevron-right' style={styles.actionIndicator} /> : null}
 				</View>
 			)
 			: null}
@@ -72,11 +93,12 @@ const Content = React.memo(({
 ));
 
 const Button = React.memo(({
-	onPress, ...props
+	onPress, backgroundColor, underlayColor, ...props
 }) => (
 	<Touch
 		onPress={() => onPress(props.title)}
-		style={{ backgroundColor: themes[props.theme].backgroundColor }}
+		style={{ backgroundColor: backgroundColor || themes[props.theme].backgroundColor }}
+		underlayColor={underlayColor}
 		enabled={!props.disabled}
 		theme={props.theme}
 	>
@@ -89,7 +111,7 @@ const ListItem = React.memo(({ ...props }) => {
 		return <Button {...props} />;
 	}
 	return (
-		<View style={{ backgroundColor: themes[props.theme].backgroundColor }}>
+		<View style={{ backgroundColor: props.backgroundColor || themes[props.theme].backgroundColor }}>
 			<Content {...props} />
 		</View>
 	);
@@ -97,7 +119,8 @@ const ListItem = React.memo(({ ...props }) => {
 
 ListItem.propTypes = {
 	onPress: PropTypes.func,
-	theme: PropTypes.string
+	theme: PropTypes.string,
+	backgroundColor: PropTypes.string
 };
 
 ListItem.displayName = 'List.Item';
@@ -114,7 +137,8 @@ Content.propTypes = {
 	translateTitle: PropTypes.bool,
 	translateSubtitle: PropTypes.bool,
 	showActionIndicator: PropTypes.bool,
-	fontScale: PropTypes.number
+	fontScale: PropTypes.number,
+	alert: PropTypes.bool
 };
 
 Content.defaultProps = {
@@ -127,7 +151,9 @@ Button.propTypes = {
 	title: PropTypes.string,
 	onPress: PropTypes.func,
 	disabled: PropTypes.bool,
-	theme: PropTypes.string
+	theme: PropTypes.string,
+	backgroundColor: PropTypes.string,
+	underlayColor: PropTypes.string
 };
 
 Button.defaultProps = {

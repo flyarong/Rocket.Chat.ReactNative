@@ -3,9 +3,12 @@ import EJSON from 'ejson';
 import normalizeMessage from './normalizeMessage';
 import findSubscriptionsRooms from './findSubscriptionsRooms';
 import { Encryption } from '../../encryption';
+import reduxStore from '../../createStore';
+import { compareServerVersion, methods } from '../../utils';
 // TODO: delete and update
 
 export const merge = (subscription, room) => {
+	const serverVersion = reduxStore.getState().server.version;
 	subscription = EJSON.fromJSONValue(subscription);
 	room = EJSON.fromJSONValue(room);
 
@@ -15,11 +18,6 @@ export const merge = (subscription, room) => {
 	if (room) {
 		if (room._updatedAt) {
 			subscription.lastMessage = normalizeMessage(room.lastMessage);
-			if (subscription.lastMessage) {
-				subscription.roomUpdatedAt = subscription.lastMessage.ts;
-			} else {
-				subscription.roomUpdatedAt = room._updatedAt;
-			}
 			subscription.description = room.description;
 			subscription.topic = room.topic;
 			subscription.announcement = room.announcement;
@@ -30,13 +28,27 @@ export const merge = (subscription, room) => {
 			subscription.usernames = room.usernames;
 			subscription.uids = room.uids;
 		}
+		if (compareServerVersion(serverVersion, '3.7.0', methods.lowerThan)) {
+			const updatedAt = room?._updatedAt ? new Date(room._updatedAt) : null;
+			const lastMessageTs = subscription?.lastMessage?.ts ? new Date(subscription.lastMessage.ts) : null;
+			subscription.roomUpdatedAt = Math.max(updatedAt, lastMessageTs);
+		} else {
+			// https://github.com/RocketChat/Rocket.Chat/blob/develop/app/ui-sidenav/client/roomList.js#L180
+			const lastRoomUpdate = room.lm || subscription.ts || subscription._updatedAt;
+			subscription.roomUpdatedAt = subscription.lr ? Math.max(new Date(subscription.lr), new Date(lastRoomUpdate)) : lastRoomUpdate;
+		}
 		subscription.ro = room.ro;
 		subscription.broadcast = room.broadcast;
 		subscription.encrypted = room.encrypted;
 		subscription.e2eKeyId = room.e2eKeyId;
 		subscription.avatarETag = room.avatarETag;
+		subscription.teamId = room.teamId;
+		subscription.teamMain = room.teamMain;
 		if (!subscription.roles || !subscription.roles.length) {
 			subscription.roles = [];
+		}
+		if (!subscription.ignored?.length) {
+			subscription.ignored = [];
 		}
 		if (room.muted && room.muted.length) {
 			subscription.muted = room.muted.filter(muted => !!muted);

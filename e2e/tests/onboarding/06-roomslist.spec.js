@@ -18,7 +18,7 @@ describe('Rooms list screen', () => {
 		});
 
 		it('should have room item', async() => {
-			await expect(element(by.id('rooms-list-view-item-general')).atIndex(0)).toExist();
+			await expect(element(by.id('rooms-list-view-item-general'))).toExist();
 		});
 		
 		// Render - Header
@@ -36,7 +36,6 @@ describe('Rooms list screen', () => {
 	describe('Usage', () => {
 		it('should search room and navigate', async() => {
 			await searchRoom('rocket.cat');
-			await waitFor(element(by.id('rooms-list-view-item-rocket.cat'))).toBeVisible().withTimeout(60000);
 			await element(by.id('rooms-list-view-item-rocket.cat')).tap();
 			await waitFor(element(by.id('room-view'))).toBeVisible().withTimeout(10000);
 			await waitFor(element(by.id('room-view-title-rocket.cat'))).toBeVisible().withTimeout(60000);

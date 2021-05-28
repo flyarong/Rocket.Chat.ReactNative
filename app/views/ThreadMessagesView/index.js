@@ -1,6 +1,6 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import { FlatList, InteractionManager } from 'react-native';
+import { FlatList } from 'react-native';
 import { connect } from 'react-redux';
 import { Q } from '@nozbe/watermelondb';
 import { sanitizedRaw } from '@nozbe/watermelondb/RawRecord';
@@ -28,11 +28,13 @@ import * as List from '../../containers/List';
 import Dropdown from './Dropdown';
 import DropdownItemHeader from './Dropdown/DropdownItemHeader';
 import { FILTER } from './filters';
-import NoDataFound from './NoDataFound';
+import BackgroundContainer from '../../containers/BackgroundContainer';
 import { isIOS } from '../../utils/deviceInfo';
 import { getBadgeColor, makeThreadName } from '../../utils/room';
 import { getHeaderTitlePosition } from '../../containers/Header';
 import SearchHeader from './SearchHeader';
+import EventEmitter from '../../utils/events';
+import { LISTENER } from '../../containers/Toast';
 
 const API_FETCH_COUNT = 50;
 
@@ -71,9 +73,7 @@ class ThreadMessagesView extends React.Component {
 
 	componentDidMount() {
 		this.mounted = true;
-		this.mountInteraction = InteractionManager.runAfterInteractions(() => {
-			this.init();
-		});
+		this.init();
 	}
 
 	componentDidUpdate(prevProps) {
@@ -87,12 +87,6 @@ class ThreadMessagesView extends React.Component {
 
 	componentWillUnmount() {
 		console.countReset(`${ this.constructor.name }.render calls`);
-		if (this.mountInteraction && this.mountInteraction.cancel) {
-			this.mountInteraction.cancel();
-		}
-		if (this.syncInteraction && this.syncInteraction.cancel) {
-			this.syncInteraction.cancel();
-		}
 		if (this.subSubscription && this.subSubscription.unsubscribe) {
 			this.subSubscription.unsubscribe();
 		}
@@ -247,7 +241,7 @@ class ThreadMessagesView extends React.Component {
 
 		try {
 			const db = database.active;
-			const threadsCollection = db.collections.get('threads');
+			const threadsCollection = db.get('threads');
 			const allThreadsRecords = await subscription.threads.fetch();
 			let threadsToCreate = [];
 			let threadsToUpdate = [];
@@ -328,10 +322,8 @@ class ThreadMessagesView extends React.Component {
 				rid: this.rid, updatedSince: updatedSince.toISOString()
 			});
 			if (result.success && result.threads) {
-				this.syncInteraction = InteractionManager.runAfterInteractions(() => {
-					const { update, remove } = result.threads;
-					this.updateThreads({ update, remove, lastThreadSync: updatedSince });
-				});
+				const { update, remove } = result.threads;
+				this.updateThreads({ update, remove, lastThreadSync: updatedSince });
 			}
 			this.setState({
 				loading: false
@@ -410,6 +402,15 @@ class ThreadMessagesView extends React.Component {
 		this.setState({ currentFilter: filter, displayingThreads });
 	}
 
+	toggleFollowThread = async(isFollowingThread, tmid) => {
+		try {
+			await RocketChat.toggleFollowMessage(tmid, !isFollowingThread);
+			EventEmitter.emit(LISTENER, { message: isFollowingThread ? I18n.t('Unfollowed_thread') : I18n.t('Following_thread') });
+		} catch (e) {
+			log(e);
+		}
+	}
+
 	renderItem = ({ item }) => {
 		const {
 			user, navigation, baseUrl, useRealName
@@ -426,6 +427,7 @@ class ThreadMessagesView extends React.Component {
 					badgeColor
 				}}
 				onPress={this.onThreadPress}
+				toggleFollowThread={this.toggleFollowThread}
 			/>
 		);
 	}
@@ -461,7 +463,7 @@ class ThreadMessagesView extends React.Component {
 			return (
 				<>
 					{this.renderHeader()}
-					<NoDataFound text={text} />
+					<BackgroundContainer text={text} />
 				</>
 			);
 		}

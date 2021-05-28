@@ -4,9 +4,8 @@ import {
 	View, StyleSheet, FlatList, Text
 } from 'react-native';
 import { connect } from 'react-redux';
-import equal from 'deep-equal';
-import { orderBy } from 'lodash';
 import { Q } from '@nozbe/watermelondb';
+import * as List from '../containers/List';
 
 import Touch from '../utils/touch';
 import database from '../lib/database';
@@ -27,10 +26,9 @@ import { createChannelRequest } from '../actions/createChannel';
 import { goRoom } from '../utils/goRoom';
 import SafeAreaView from '../containers/SafeAreaView';
 
+const QUERY_SIZE = 50;
+
 const styles = StyleSheet.create({
-	separator: {
-		marginLeft: 60
-	},
 	button: {
 		height: 46,
 		flexDirection: 'row',
@@ -62,7 +60,7 @@ class NewMessageView extends React.Component {
 			id: PropTypes.string,
 			token: PropTypes.string
 		}),
-		createChannel: PropTypes.func,
+		create: PropTypes.func,
 		maxUsers: PropTypes.number,
 		theme: PropTypes.string,
 		isMasterDetail: PropTypes.bool
@@ -77,40 +75,20 @@ class NewMessageView extends React.Component {
 		};
 	}
 
-	shouldComponentUpdate(nextProps, nextState) {
-		const { search, chats } = this.state;
-		const { theme } = this.props;
-		if (nextProps.theme !== theme) {
-			return true;
-		}
-		if (!equal(nextState.search, search)) {
-			return true;
-		}
-		if (!equal(nextState.chats, chats)) {
-			return true;
-		}
-		return false;
-	}
-
-	componentWillUnmount() {
-		if (this.querySubscription && this.querySubscription.unsubscribe) {
-			this.querySubscription.unsubscribe();
-		}
-	}
-
 	// eslint-disable-next-line react/sort-comp
 	init = async() => {
 		try {
 			const db = database.active;
-			const observable = await db.collections
+			const chats = await db.collections
 				.get('subscriptions')
-				.query(Q.where('t', 'd'))
-				.observeWithColumns(['room_updated_at']);
+				.query(
+					Q.where('t', 'd'),
+					Q.experimentalTake(QUERY_SIZE),
+					Q.experimentalSortBy('room_updated_at', Q.desc)
+				)
+				.fetch();
 
-			this.querySubscription = observable.subscribe((data) => {
-				const chats = orderBy(data, ['roomUpdatedAt'], ['desc']);
-				this.setState({ chats });
-			});
+			this.setState({ chats });
 		} catch (e) {
 			log(e);
 		}
@@ -138,11 +116,17 @@ class NewMessageView extends React.Component {
 		navigation.navigate('SelectedUsersViewCreateChannel', { nextAction: () => navigation.navigate('CreateChannelView') });
 	}
 
+	createTeam = () => {
+		logEvent(events.NEW_MSG_CREATE_TEAM);
+		const { navigation } = this.props;
+		navigation.navigate('SelectedUsersViewCreateChannel', { nextAction: () => navigation.navigate('CreateChannelView', { isTeam: true }) });
+	}
+
 	createGroupChat = () => {
 		logEvent(events.NEW_MSG_CREATE_GROUP_CHAT);
-		const { createChannel, maxUsers, navigation } = this.props;
+		const { create, maxUsers, navigation } = this.props;
 		navigation.navigate('SelectedUsersViewCreateChannel', {
-			nextAction: () => createChannel({ group: true }),
+			nextAction: () => create({ group: true }),
 			buttonText: I18n.t('Create'),
 			maxUsers
 		});
@@ -194,10 +178,16 @@ class NewMessageView extends React.Component {
 						testID: 'new-message-view-create-channel',
 						first: true
 					})}
+					{this.renderButton({
+						onPress: this.createTeam,
+						title: I18n.t('Create_Team'),
+						icon: 'teams',
+						testID: 'new-message-view-create-team'
+					})}
 					{maxUsers > 2 ? this.renderButton({
 						onPress: this.createGroupChat,
 						title: I18n.t('Create_Direct_Messages'),
-						icon: 'team',
+						icon: 'message',
 						testID: 'new-message-view-create-direct-message'
 					}) : null}
 					{this.renderButton({
@@ -211,10 +201,6 @@ class NewMessageView extends React.Component {
 		);
 	}
 
-	renderSeparator = () => {
-		const { theme } = this.props;
-		return <View style={[sharedStyles.separator, styles.separator, { backgroundColor: themes[theme].separatorColor }]} />;
-	}
 
 	renderItem = ({ item, index }) => {
 		const { search, chats } = this.state;
@@ -254,7 +240,7 @@ class NewMessageView extends React.Component {
 				keyExtractor={item => item._id}
 				ListHeaderComponent={this.renderHeader}
 				renderItem={this.renderItem}
-				ItemSeparatorComponent={this.renderSeparator}
+				ItemSeparatorComponent={List.Separator}
 				contentContainerStyle={{ backgroundColor: themes[theme].backgroundColor }}
 				keyboardShouldPersistTaps='always'
 			/>
@@ -279,7 +265,7 @@ const mapStateToProps = state => ({
 });
 
 const mapDispatchToProps = dispatch => ({
-	createChannel: params => dispatch(createChannelRequest(params))
+	create: params => dispatch(createChannelRequest(params))
 });
 
 export default connect(mapStateToProps, mapDispatchToProps)(withTheme(NewMessageView));

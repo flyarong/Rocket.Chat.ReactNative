@@ -1,37 +1,46 @@
-import React from 'react';
-import { View, Text } from 'react-native';
-import removeMarkdown from 'remove-markdown';
+import React, { memo, useEffect, useState } from 'react';
+import { View } from 'react-native';
 import PropTypes from 'prop-types';
 
-import shortnameToUnicode from '../../utils/shortnameToUnicode';
 import { CustomIcon } from '../../lib/Icons';
 import styles from './styles';
 import { themes } from '../../constants/colors';
 import I18n from '../../i18n';
+import Markdown from '../markdown';
 
-const RepliedThread = React.memo(({
+const RepliedThread = memo(({
 	tmid, tmsg, isHeader, fetchThreadName, id, isEncrypted, theme
 }) => {
 	if (!tmid || !isHeader) {
 		return null;
 	}
 
-	if (!tmsg) {
-		fetchThreadName(tmid, id);
+	const [msg, setMsg] = useState(isEncrypted ? I18n.t('Encrypted_message') : tmsg);
+	const fetch = async() => {
+		const threadName = await fetchThreadName(tmid, id);
+		setMsg(threadName);
+	};
+
+	useEffect(() => {
+		if (!msg) {
+			fetch();
+		}
+	}, []);
+
+	if (!msg) {
 		return null;
-	}
-
-	let msg = shortnameToUnicode(tmsg);
-	msg = removeMarkdown(msg);
-
-	if (isEncrypted) {
-		msg = I18n.t('Encrypted_message');
 	}
 
 	return (
 		<View style={styles.repliedThread} testID={`message-thread-replied-on-${ msg }`}>
 			<CustomIcon name='threads' size={20} style={styles.repliedThreadIcon} color={themes[theme].tintColor} />
-			<Text style={[styles.repliedThreadName, { color: themes[theme].tintColor }]} numberOfLines={1}>{msg}</Text>
+			<Markdown
+				msg={msg}
+				theme={theme}
+				style={[styles.repliedThreadName, { color: themes[theme].tintColor }]}
+				preview
+				numberOfLines={1}
+			/>
 			<View style={styles.repliedThreadDisclosure}>
 				<CustomIcon
 					name='chevron-right'
@@ -41,23 +50,6 @@ const RepliedThread = React.memo(({
 			</View>
 		</View>
 	);
-}, (prevProps, nextProps) => {
-	if (prevProps.tmid !== nextProps.tmid) {
-		return false;
-	}
-	if (prevProps.tmsg !== nextProps.tmsg) {
-		return false;
-	}
-	if (prevProps.isEncrypted !== nextProps.isEncrypted) {
-		return false;
-	}
-	if (prevProps.isHeader !== nextProps.isHeader) {
-		return false;
-	}
-	if (prevProps.theme !== nextProps.theme) {
-		return false;
-	}
-	return true;
 });
 
 RepliedThread.propTypes = {

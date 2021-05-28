@@ -1,6 +1,11 @@
 const axios = require('axios').default;
 const data = require('../data');
 
+const TEAM_TYPE = {
+	PUBLIC: 0,
+	PRIVATE: 1
+};
+
 let server = data.server
 
 const rocketchat = axios.create({
@@ -20,6 +25,7 @@ const login = async (username, password) => {
     const authToken = response.data.data.authToken
     rocketchat.defaults.headers.common['X-User-Id'] = userId
     rocketchat.defaults.headers.common['X-Auth-Token'] = authToken
+    return { authToken, userId };
 }
 
 const createUser = async (username, password, name, email) => {
@@ -40,16 +46,36 @@ const createUser = async (username, password, name, email) => {
 const createChannelIfNotExists = async (channelname) => {
     console.log(`Creating public channel ${channelname}`)
     try {
-        await rocketchat.post('channels.create', {
+        const room = await rocketchat.post('channels.create', {
             "name": channelname
         })
+        return room
     } catch (createError) {
         try { //Maybe it exists already?
-            await rocketchat.get(`channels.info?roomName=${channelname}`)
+            const room = rocketchat.get(`channels.info?roomName=${channelname}`)
+            return room
         } catch (infoError) {
             console.log(JSON.stringify(createError))
             console.log(JSON.stringify(infoError))
             throw "Failed to find or create public channel"
+        }
+    }
+}
+
+const createTeamIfNotExists = async (teamname) => {
+    console.log(`Creating private team ${teamname}`)
+    try {
+        await rocketchat.post('teams.create', {
+            "name": teamname,
+            "type": TEAM_TYPE.PRIVATE
+        })
+    } catch (createError) {
+        try { //Maybe it exists already?
+            await rocketchat.get(`teams.info?teamName=${teamname}`)
+        } catch (infoError) {
+            console.log(JSON.stringify(createError))
+            console.log(JSON.stringify(infoError))
+            throw "Failed to find or create private team"
         }
     }
 }
@@ -62,12 +88,41 @@ const createGroupIfNotExists = async (groupname) => {
         })
     } catch (createError) {
         try { //Maybe it exists already?
-            await rocketchat.get(`group.info?roomName=${groupname}`)
+            await rocketchat.get(`groups.info?roomName=${groupname}`)
         } catch (infoError) {
             console.log(JSON.stringify(createError))
             console.log(JSON.stringify(infoError))
             throw "Failed to find or create private group"
         }
+    }
+}
+
+const changeChannelJoinCode = async (roomId, joinCode) => {
+    console.log(`Changing channel Join Code ${roomId}`)
+    try {
+        await rocketchat.post('method.call/saveRoomSettings', {
+            message: JSON.stringify({
+                method: 'saveRoomSettings',
+                params: [
+                    roomId,
+                    { joinCode }
+                ]
+            })
+        })
+    } catch (createError) {
+        console.log(JSON.stringify(createError))
+        throw "Failed to create protected channel"
+    }
+}
+
+const sendMessage = async (user, channel, msg) => {
+    console.log(`Sending message to ${channel}`)
+    try {
+        await login(user.username, user.password);
+        await rocketchat.post('chat.postMessage', { channel, msg });
+    } catch (infoError) {
+        console.log(JSON.stringify(infoError))
+        throw "Failed to find or create private group"
     }
 }
 
@@ -84,7 +139,11 @@ const setup = async () => {
     for (var channelKey in data.channels) {
         if (data.channels.hasOwnProperty(channelKey)) {
             const channel = data.channels[channelKey]
-            await createChannelIfNotExists(channel.name)
+            const { data: { channel: { _id } } } = await createChannelIfNotExists(channel.name)
+
+            if (channel.joinCode) {
+                await changeChannelJoinCode(_id, channel.joinCode);
+            }
         }
     }
 
@@ -97,7 +156,26 @@ const setup = async () => {
         }
     }
 
+    for (var teamKey in data.teams) {
+        if (data.teams.hasOwnProperty(teamKey)) {
+            const team = data.teams[teamKey]
+            await createTeamIfNotExists(team.name)
+        }
+    }
+
     return
 }
 
-module.exports = setup
+const get = (endpoint) => {
+    console.log(`GET /${ endpoint }`)
+    return rocketchat.get(endpoint);
+}
+
+const post = (endpoint, body) => {
+    console.log(`POST /${ endpoint } ${ JSON.stringify(body) }`)
+    return rocketchat.post(endpoint, body);
+}
+
+module.exports = {
+    setup, sendMessage, get, post, login
+}
